@@ -1,5 +1,5 @@
 "use client";
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { services } from '@/data/services';
 import { formatPrice } from '@/utils/formatPrice';
@@ -9,8 +9,12 @@ import { ArrowLeft, ShieldCheck, Star } from 'lucide-react';
 export default function BookingPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const serviceId = searchParams.get('service');
-  const selectedService = services.find(s => s.id === serviceId);
+  const serviceIdFromUrl = searchParams.get('service');
+
+  // যদি URL-এ সার্ভিস আইডি না থাকে, তবে ডিফল্টভাবে প্রথম সার্ভিসটি সিলেক্ট থাকবে
+  const [selectedServiceId, setSelectedServiceId] = useState(
+    serviceIdFromUrl || (services[0] ? services[0].id : '')
+  );
 
   const [formData, setFormData] = useState({
     name: '',
@@ -20,12 +24,20 @@ export default function BookingPage() {
     address: ''
   });
 
+  useEffect(() => {
+    if (serviceIdFromUrl) {
+      setSelectedServiceId(serviceIdFromUrl);
+    }
+  }, [serviceIdFromUrl]);
+
+  // নির্বাচিত সার্ভিস খুঁজে বের করা
+  const selectedService = services.find(s => s.id === selectedServiceId);
+
   const handleBookingSubmit = (e) => {
     e.preventDefault();
 
     if (!selectedService) {
-      alert('Please select a service first from the services page.');
-      router.push('/services');
+      alert('Please select a service to book.');
       return;
     }
 
@@ -40,21 +52,15 @@ export default function BookingPage() {
       date: formData.date,
       time: formData.timeSlot,
       location: formData.address,
-      status: 'Pending' // প্রাথমিক স্ট্যাটাস পেন্ডিং থাকবে
+      status: 'Pending'
     };
 
-    // ২. localStorage থেকে আগের বুকিংগুলো আনা
+    // ২. localStorage-এ সেভ করা
     const existingBookings = JSON.parse(localStorage.getItem('fixmate_bookings') || '[]');
-
-    // ৩. নতুন বুকিং লিস্টে যোগ করা
     existingBookings.push(newBooking);
-
-    // ৪. localStorage-এ আবার সেভ করা
     localStorage.setItem('fixmate_bookings', JSON.stringify(existingBookings));
 
     alert('Booking Confirmed Successfully!');
-    
-    // ৫. কাস্টমার ড্যাশবোর্ডে রিডাইরেক্ট করা
     router.push('/customer/dashboard');
   };
 
@@ -68,20 +74,35 @@ export default function BookingPage() {
 
         <div className="bg-white rounded-3xl p-8 sm:p-10 border border-slate-200 shadow-sm">
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mb-2">Complete Your Booking</h1>
-          <p className="text-slate-500 text-sm mb-8">Please provide your details to confirm the service appointment.</p>
+          <p className="text-slate-500 text-sm mb-8">Select your required service and provide your details to confirm the appointment.</p>
 
-          {/* নির্বাচিত সার্ভিসের বিবরণ */}
-          {selectedService && (
-            <div className="bg-emerald-50/60 border border-emerald-100 rounded-2xl p-5 mb-8 flex items-center justify-between">
-              <div>
-                <span className="text-[10px] font-bold uppercase text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-md inline-block mb-1">
-                  {selectedService.category}
-                </span>
-                <h3 className="text-lg font-bold text-slate-900">{selectedService.name}</h3>
+          {/* Service Selector & Selected Details Box */}
+          <div className="bg-emerald-50/60 border border-emerald-100 rounded-2xl p-5 mb-8">
+            <label className="block text-xs font-bold uppercase text-emerald-800 mb-2">Select Service to Book</label>
+            <select 
+              value={selectedServiceId}
+              onChange={(e) => setSelectedServiceId(e.target.value)}
+              className="w-full px-4 py-3 bg-white border border-emerald-200 rounded-xl text-sm font-bold text-slate-900 outline-none focus:border-emerald-500 mb-4 shadow-sm"
+            >
+              {services.map((srv) => (
+                <option key={srv.id} value={srv.id}>
+                  {srv.name} — ({formatPrice(srv.price)})
+                </option>
+              ))}
+            </select>
+
+            {selectedService && (
+              <div className="flex items-center justify-between pt-3 border-t border-emerald-100/80">
+                <div>
+                  <span className="text-[10px] font-bold uppercase text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-md inline-block mb-1">
+                    {selectedService.category}
+                  </span>
+                  <h3 className="text-base font-bold text-slate-900">{selectedService.name}</h3>
+                </div>
+                <span className="text-lg font-extrabold text-emerald-600">{formatPrice(selectedService.price)}</span>
               </div>
-              <span className="text-xl font-extrabold text-emerald-600">{formatPrice(selectedService.price)}</span>
-            </div>
-          )}
+            )}
+          </div>
 
           <form onSubmit={handleBookingSubmit} className="space-y-5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
